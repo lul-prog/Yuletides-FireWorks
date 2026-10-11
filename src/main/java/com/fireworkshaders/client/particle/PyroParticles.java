@@ -141,7 +141,7 @@ public final class PyroParticles {
         }
 
         protected void setColourFrom(int rgb, float exposure) {
-            float gain = (float) FSConfig.CLIENT.emissiveGain.get() * exposure;
+            float gain = FSConfig.CLIENT.emissiveGain.get().floatValue() * exposure;
             int gained = PyroMath.gain(rgb, gain);
             this.rCol = PyroMath.red(gained);
             this.gCol = PyroMath.green(gained);
@@ -491,7 +491,7 @@ public final class PyroParticles {
             super(level, x, y, z);
             this.lifetime = Math.max(2, options.life());
             this.quadSize = 1.4F * options.scale();
-            float exposure = options.exposure() * (float) FSConfig.CLIENT.emissiveGain.get() * 0.55F;
+            float exposure = options.exposure() * FSConfig.CLIENT.emissiveGain.get().floatValue() * 0.55F;
             this.rCol = Mth.lerp(0.35F, PyroMath.red(options.rgb()), 1.0F) * Mth.clamp(exposure, 0.5F, 2.0F);
             this.gCol = Mth.lerp(0.35F, PyroMath.green(options.rgb()), 1.0F) * Mth.clamp(exposure, 0.5F, 2.0F);
             this.bCol = Mth.lerp(0.35F, PyroMath.blue(options.rgb()), 1.0F) * Mth.clamp(exposure, 0.5F, 2.0F);

@@ -10,7 +10,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -119,7 +118,7 @@ public final class FireworkAudio implements FxBus.AudioHook {
         if (!FSConfig.CLIENT.layeredAudio.get()) {
             return;
         }
-        float master = (float) FSConfig.CLIENT.masterVolume.get();
+        float master = FSConfig.CLIENT.masterVolume.get().floatValue();
         if (master <= 0.0F) {
             return;
         }
@@ -268,22 +267,10 @@ public final class FireworkAudio implements FxBus.AudioHook {
             if (minecraft == null) {
                 return false;
             }
-            Resource resource = null;
-            try {
-                resource = minecraft.getResourceManager().getResource(
-                        new ResourceLocation(FireworkShaders.MOD_ID, "sounds/fireworks/boom.ogg"));
-                customAudioAvailable = resource != null;
-            } catch (IOException e) {
-                customAudioAvailable = Boolean.FALSE;
-            } finally {
-                if (resource != null) {
-                    try {
-                        resource.close();
-                    } catch (IOException ignored) {
-                        // nothing sensible to do here
-                    }
-                }
-            }
+            // 1.20.1: getResource returns Optional<Resource> and a Resource holds no open stream,
+            // so existence is the probe — there is nothing to close.
+            customAudioAvailable = minecraft.getResourceManager().getResource(
+                    new ResourceLocation(FireworkShaders.MOD_ID, "sounds/fireworks/boom.ogg")).isPresent();
         }
         return customAudioAvailable;
     }

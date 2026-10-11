@@ -3,11 +3,14 @@ package com.fireworkshaders.common.net;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -46,10 +49,13 @@ public final class S2CPadSyncPacket {
     public static S2CPadSyncPacket decode(FriendlyByteBuf buf) {
         BlockPos pos = buf.readBlockPos();
         CompoundTag program = buf.readNbt();
-        ListTag rockets = buf.readCollection(ListTag::new, b -> {
+        // ListTag has no (int) constructor, so collect into an ArrayList and wrap.
+        List<Tag> tags = buf.readCollection(ArrayList::new, b -> {
             CompoundTag tag = b.readNbt();
             return tag == null ? new CompoundTag() : tag;
         });
+        ListTag rockets = new ListTag();
+        rockets.addAll(tags);
         return new S2CPadSyncPacket(pos, program == null ? new CompoundTag() : program, rockets,
                 buf.readVarInt(), buf.readVarInt(), buf.readVarInt());
     }
