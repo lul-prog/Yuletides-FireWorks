@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "armed=false": {
+      "model": "fireworkshaders:block/launch_pad"
+    },
+    "armed=true": {
+      "model": "fireworkshaders:block/launch_pad_armed"
+    }
+  }
+}

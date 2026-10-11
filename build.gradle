@@ -1,3 +1,34 @@
+/*
+ * Yuletide Fireworks — advanced shader-driven pyrotechnics for Minecraft 1.20.1 (Forge)
+ *
+ * Design decision on dependencies (read this before adding libraries):
+ *
+ *   1. Particle core — NO external library.
+ *      The spark/smoke/ember particles are hand-written on top of vanilla's Particle +
+ *      ParticleRenderType. That is what keeps us compatible with Iris/Oculus: a shaderpack can
+ *      only patch the *vanilla* shader programs. Any particle drawn with a hand-rolled GLSL
+ *      program bypasses the pack (no bloom, no tonemapping, no fog) and looks flat next to the
+ *      rest of the scene. We therefore render through GameRenderer#getParticleShader and the
+ *      vanilla particle atlas, and get our "emissive" look from a fully-bright lightmap value
+ *      + additive blending + HDR-bright textures. That combination is picked up by every
+ *      bloom pass in Complementary / BSL / Photon / Nostalgia etc.
+ *
+ *   2. GeckoLib — deliberately NOT used.
+ *      It is an animation framework for animated models (mobs, machines). Firework shells are
+ *      procedural, GPU-light billboards; an animated-model pipeline would add a large jar, a
+ *      second render pass and a per-frame animation controller for zero visual gain.
+ *
+ *   3. Lodestone (lodestonelib / LodestoneCore) — not used inside the jar either.
+ *      It is an excellent *resource-pack* particle framework, but it drives particles from JSON
+ *      + its own particle engine. Our rockets need runtime-composed, math-generated shells
+ *      (Fibonacci spheres, rings, willow droop, RGB ramps) that are generated per explosion
+ *      from a design object; that is not expressible as static JSON. We do however ship
+ *      compatible asset conventions so Lodestone-authored packs can be dropped on top.
+ *
+ *   4. Optional dev-runtime deps for shader testing are provided at the bottom of this file,
+ *      gated behind -Pshaders=true. They are runtime-only, never compiled against.
+ */
+
 plugins {
     id 'eclipse'
     id 'idea'
@@ -5,72 +36,143 @@ plugins {
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
 }
 
-version = '1.0.0'
+version = "${mod_version}"
 group = 'com.fireworkshaders'
-
-base {
-    archivesName = 'fireworkshaders'
-}
+archivesBaseName = 'yuletide-fireworks'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 minecraft {
     mappings channel: 'official', version: '1.20.1'
+    // Needed because we read/write runtime-composed designs from ItemStack NBT and because our
+    // particle options are serialised on the network.
+    copyIdeResources = true
 
     runs {
         client {
             workingDirectory project.file('run')
             property 'forge.logging.console.level', 'debug'
+            property 'forge.logging.markers', 'REGISTRIES'
+            // Big firework shows spawn a lot of particles in a single tick; keep the log readable.
+            property 'fml.earlyprogresswindow', 'false'
             mods {
-                fireworkshaders {
+                yuletidefireworks {
                     source sourceSets.main
                 }
             }
+        }
+
+        // Second client, handy for testing the Launch Pad / Remote Igniter sync between two players.
+        client2 {
+            parent runs.client
+            workingDirectory project.file('run2')
+            args '--username', 'PyroTech'
         }
 
         server {
-            workingDirectory project.file('run')
+            workingDirectory project.file('run-server')
             property 'forge.logging.console.level', 'debug'
             mods {
-                fireworkshaders {
+                yuletidefireworks {
                     source sourceSets.main
                 }
             }
         }
+
+        // Headless-ish automated visual test: loads a flat world so /fireworkshaders test can be
+        // run immediately without a world wizard.
+        gameTestServer {
+            workingDirectory project.file('run-gametest')
+            property 'forge.enabledGameTestNamespaces', 'yuletidefireworks'
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+            args '--mod', 'yuletidefireworks', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
     }
 }
 
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
 repositories {
-    maven {
-        url = 'https://maven.minecraftforge.net/'
-    }
+    maven { url = 'https://maven.minecraftforge.net/' }
+    maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+    mavenCentral()
+    // Kept for convenience if you later decide to shade a helper library:
+    maven { name = 'BlameJared'; url = 'https://maven.blamejared.com' }
+    maven { name = 'CurseForge'; url = 'https://cursemaven.com' }
 }
 
 dependencies {
-    minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // No additional runtime libraries are needed for this foundation. The workstation
-    // uses Forge menus/networking, and the fireworks use this mod's GLSL renderer;
-    // avoiding a Lodestone/GeckoLib hard dependency keeps the client setup lean.
+    // ---- Optional compile-time integrations -------------------------------------------------
+    // Both of these are resolved with `compileOnly`, so the shipped jar has NO hard dependency
+    // and the mod boots fine on a vanilla-modded install. They are only used to light up the
+    // "Shader status" line in the Pyrotechnic Workstation GUI.
+    // compileOnly fg.deobf("curse.maven:embeddium-908741:5329621")   // Rubidium/Embeddium (Sodium port)
+    // compileOnly fg.deobf("curse.maven:oculus-970477:5249489")      // Oculus (Iris port)
+
+    // ---- Optional dev-runtime shader testing (never shipped) --------------------------------
+    // ./gradlew runClient -Pshaders=true  -> boots with Embeddium + Oculus so you can tune the
+    // emissive pipeline against a real shaderpack. Versions are pinned to 1.20.1 builds.
+    if (project.hasProperty('shaders')) {
+        runtimeOnly fg.deobf("curse.maven:embeddium-908741:5329621")
+        runtimeOnly fg.deobf("curse.maven:oculus-970477:5249489")
+        runtimeOnly fg.deobf("curse.maven:chloride-1229799:7023469")
+    }
 }
 
 tasks.named('processResources', ProcessResources).configure {
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     var replaceProperties = [
-            minecraft_version      : '1.20.1',
-            minecraft_version_range: '[1.20.1,1.21)',
-            forge_version          : '47.2.0',
-            forge_version_range    : '[47,)',
-            loader_version_range   : '[47,)',
-            mod_id                 : 'fireworkshaders',
-            mod_name               : 'Firework Shaders',
-            mod_license            : 'All Rights Reserved',
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            forge_version          : forge_version,
+            forge_version_range    : forge_version_range,
+            loader_version_range   : loader_version_range,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
             mod_version            : project.version,
-            mod_authors            : 'Simon Alzate',
-            mod_description        : 'Advanced shader-driven fireworks with a modular pyrotechnic workstation and custom rocket designs.',
+            mod_authors            : mod_authors,
+            mod_description        : mod_description,
     ]
     inputs.properties replaceProperties
-    filesMatching(['META-INF/mods.toml']) {
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
         expand replaceProperties + [project: project]
     }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+    finalizedBy 'reobfJar'
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-removal']
 }
