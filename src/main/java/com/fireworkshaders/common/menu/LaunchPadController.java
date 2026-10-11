@@ -26,8 +26,11 @@ public final class LaunchPadController {
 
     @Nullable
     private static LaunchPadBlockEntity pad(ServerPlayer player, BlockPos pos) {
-        if (player.distanceToSqr(Vec3.atCenterOf(pos)) > 64.0 * 64.0) {
+        if (!(player.containerMenu instanceof LaunchPadMenu menu) || !menu.getPos().equals(pos)) {
             return null;
+        }
+        if (player.distanceToSqr(Vec3.atCenterOf(pos)) > 64.0) {
+            return null; // 8 blocks, matching the menu's vanilla validity range
         }
         return player.level().getBlockEntity(pos) instanceof LaunchPadBlockEntity launchPad
                 ? launchPad : null;

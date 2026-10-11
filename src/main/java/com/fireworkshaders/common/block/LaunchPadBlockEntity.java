@@ -50,9 +50,9 @@ public class LaunchPadBlockEntity extends net.minecraft.world.level.block.entity
     public enum PadState {
         /** Nothing loaded or nothing armed. */
         IDLE,
-        /** Countdown running, waiting for T-0. */
+        /** Primed and waiting for an explicit GO command. */
         ARMED,
-        /** Show in progress. */
+        /** Countdown or show in progress. */
         RUNNING,
         /** Aborted; needs an explicit arm before it will fire again. */
         SAFE
@@ -91,10 +91,7 @@ public class LaunchPadBlockEntity extends net.minecraft.world.level.block.entity
 
     /** Ticks until T-0, or a negative value when no countdown is running. */
     public int ticksToStart() {
-        if (this.state != PadState.ARMED && this.state != PadState.RUNNING) {
-            return -1;
-        }
-        if (this.level == null) {
+        if (this.state != PadState.RUNNING || this.level == null) {
             return -1;
         }
         return (int) (this.startTick - this.level.getGameTime());
@@ -155,6 +152,8 @@ public class LaunchPadBlockEntity extends net.minecraft.world.level.block.entity
             return;
         }
         this.state = PadState.ARMED;
+        this.startTick = 0L;
+        this.lastElapsed = -1;
         this.countdownStage = -1;
         updateArmedState();
         setChanged();
@@ -205,23 +204,17 @@ public class LaunchPadBlockEntity extends net.minecraft.world.level.block.entity
         if (this.level == null || this.level.isClientSide) {
             return;
         }
+        // Also repairs the visible block property after loading a persisted active state into SAFE.
+        updateArmedState();
         switch (this.state) {
             case ARMED -> {
-                int ticks = ticksToStart();
-                if (ticks <= 0) {
-                    // T-0 arrives while still ARMED only if the pad was armed but never told to go.
-                    this.state = PadState.RUNNING;
-                    this.lastElapsed = -1;
-                } else {
-                    playCountdownTick(ticks);
-                }
+                // Priming is intentionally inert. Only an explicit GO starts the countdown.
             }
             case RUNNING -> {
                 int elapsed = elapsedTicks();
-                if (elapsed >= 0) {
-                    if (this.lastElapsed < 0) {
-                        this.lastElapsed = -1;
-                    }
+                if (elapsed < 0) {
+                    playCountdownTick(-elapsed);
+                } else {
                     if (elapsed != this.lastElapsed) {
                         for (ShowProgram.Cue cue : this.program.due(elapsed, this.lastElapsed)) {
                             fire(cue.slot());
@@ -339,7 +332,10 @@ public class LaunchPadBlockEntity extends net.minecraft.world.level.block.entity
 
     @Override
     public void clearContent() {
-        this.rockets.clear();
+        for (int i = 0; i < this.rockets.size(); i++) {
+            this.rockets.set(i, ItemStack.EMPTY);
+        }
+        setChanged();
     }
 
     public void dropContents() {
@@ -368,12 +364,20 @@ public class LaunchPadBlockEntity extends net.minecraft.world.level.block.entity
         super.load(tag);
         ContainerHelper.loadAllItems(tag, this.rockets);
         this.program = ShowProgram.fromTag(tag.getCompound("Program"));
-        this.selectedCue = tag.getInt("Selected");
+        this.selectedCue = Math.max(0, Math.min(ShowProgram.MAX_CUES - 1, tag.getInt("Selected")));
         try {
             this.state = PadState.valueOf(tag.getString("State"));
         } catch (IllegalArgumentException e) {
             this.state = PadState.IDLE;
         }
+        if (this.state == PadState.RUNNING) {
+            // Runtime clock fields are deliberately not resumed from NBT. A chunk/server reload
+            // must not replay every overdue cue at once from a default or stale start tick.
+            this.state = PadState.SAFE;
+        }
+        this.startTick = 0L;
+        this.lastElapsed = -1;
+        this.countdownStage = -1;
     }
 
     @Override

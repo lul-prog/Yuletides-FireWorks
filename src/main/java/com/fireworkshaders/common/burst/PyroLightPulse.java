@@ -25,9 +25,10 @@ import java.util.List;
  * Vanilla's {@code minecraft:light} block is exactly the right tool: it is invisible, emits light
  * level 15, does not collide, and does not survive being pushed.
  *
- * <p>Pulses are removed on a {@link TickTask} rather than by a block entity ticker, so there is
- * nothing to persist: if the server dies mid-show, the light blocks are simply gone with it (they
- * are the light block, not our state — no orphaned block entities, no chunk-save surprises).
+ * <p>Pulses are removed by a {@link TickTask} rather than a block entity ticker. Placement is
+ * restricted to air so cleanup cannot erase a player's block or another pulse's light. Cleanup is
+ * best-effort for loaded chunks; as with any temporary world block, an abrupt server stop before
+ * the task runs can leave a vanilla light block behind.
  */
 public final class PyroLightPulse {
 
@@ -51,7 +52,14 @@ public final class PyroLightPulse {
         long seed = plan.seed();
 
         List<BlockPos> placed = new ArrayList<>(wanted);
-        for (int i = 0; i < wanted; i++) {
+        // The epicentre gets first claim — that is the light the audience sees reflected in the fog.
+        BlockPos centre = BlockPos.containing(origin);
+        if (placeLight(level, centre)) {
+            placed.add(centre);
+        }
+        // Count the epicentre against the configured limit; it replaces rather than adds to one of
+        // the random pulses.
+        for (int i = 0; i < wanted - 1; i++) {
             double dx = PyroMath.randSigned(seed, 3000 + i) * radius;
             double dy = PyroMath.randSigned(seed, 4000 + i) * radius * 0.55;
             double dz = PyroMath.randSigned(seed, 5000 + i) * radius;
@@ -59,11 +67,6 @@ public final class PyroLightPulse {
             if (placeLight(level, pos)) {
                 placed.add(pos);
             }
-        }
-        // The epicentre gets a light too — that is the one the audience sees reflected in the fog.
-        BlockPos centre = BlockPos.containing(origin);
-        if (placeLight(level, centre)) {
-            placed.add(centre);
         }
         if (placed.isEmpty()) {
             return;
@@ -82,9 +85,10 @@ public final class PyroLightPulse {
             return false;
         }
         BlockState existing = level.getBlockState(pos);
-        // Never overwrite anything real. Fireworks are not allowed to damage a build, and a light
-        // block placed inside a wall would be a lighting update storm for nothing.
-        if (!existing.isAir() && !existing.canBeReplaced()) {
+        // Only air is safe. Replaceable plants and existing light blocks can still belong to a
+        // player or another pulse; replacing them and later setting the position to air would lose
+        // the original block (or prematurely erase the other pulse's light).
+        if (!existing.isAir()) {
             return false;
         }
         level.setBlock(pos, Blocks.LIGHT.defaultBlockState().setValue(LightBlock.LEVEL, 15), 3);

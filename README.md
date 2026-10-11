@@ -32,7 +32,7 @@ workstation.
 
 A custom block with a custom GUI. It is not a recipe grid — it is a *design bench*:
 
-* **Reagent slots (4)** — real chemistry. Strontium nitrate burns 606 nm crimson, barium nitrate
+* **Reagent slots (5)** — real chemistry. Strontium nitrate burns 606 nm crimson, barium nitrate
   524 nm green, copper(I) chloride 455 nm azure, sodium nitrate washes everything out amber,
   magnesium and aluminium are the brighteners, potassium perchlorate is the oxidiser. The colour a
   shell produces is the emission colour of the salts you put in it, and the palette of your design

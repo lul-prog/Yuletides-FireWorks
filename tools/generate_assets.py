@@ -233,7 +233,7 @@ def generate_gui():
     draw.line([178, 14, 337, 14], fill=(70, 76, 92, 255))
 
     # machine slots (mirrors the menu constants)
-    for i in range(4):
+    for i in range(5):
         slot_recess(draw, 24, 26 + i * 22)
     for i in range(2):
         slot_recess(draw, 60, 26 + i * 22)
@@ -249,7 +249,7 @@ def generate_gui():
     draw.point((53, 67), fill=(220, 226, 240, 255))
 
     # label rails on the reagent column
-    for i in range(4):
+    for i in range(5):
         draw.line([46, 32 + i * 22, 74, 32 + i * 22], fill=(58, 62, 74, 255))
 
     # hazard stripe across the bottom of the machine half

@@ -36,14 +36,9 @@ public final class RemoteIgniterController {
             // The client claimed to be holding the igniter in a hand that does not have one.
             return;
         }
-
-        if (action == FSAction.IGNITER_CYCLE_MODE) {
-            RemoteIgniterItem.Mode next = RemoteIgniterItem.cycleMode(stack);
-            player.displayClientMessage(Component.translatable("message." + FireworkShaders.MOD_ID
-                            + ".igniter_mode", Component.translatable("mode." + FireworkShaders.MOD_ID
-                            + "." + next.name().toLowerCase(java.util.Locale.ROOT)))
-                    .withStyle(ChatFormatting.AQUA), true);
-            player.containerMenu.broadcastChanges();
+        int selectedAction = RemoteIgniterItem.actionFor(RemoteIgniterItem.mode(stack));
+        if (action != selectedAction) {
+            // The item mode is server-authoritative; a modified client cannot bypass SAFE/ARM.
             return;
         }
 

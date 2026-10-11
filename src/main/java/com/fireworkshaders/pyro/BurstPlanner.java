@@ -86,7 +86,8 @@ public final class BurstPlanner {
 
         // ---- 3. the stars -------------------------------------------------------------------
         int starCount = design.starCount();
-        int perStarGlitter = flags(PyroFlags.CRACKLE) ? Math.min(MAX_GLITTER, starCount / 3) : 0;
+        int perStarGlitter = design.has(EffectModule.CRACKLE)
+                ? Math.min(MAX_GLITTER, starCount / 3) : 0;
         List<BurstPatterns.ShellStar> cloud = BurstPatterns.cast(design, starCount, face, seed);
 
         for (int i = 0; i < cloud.size(); i++) {
@@ -195,10 +196,6 @@ public final class BurstPlanner {
                 ? Math.min(12, 3 + Math.round(design.caliber() * 3.0F))
                 : (design.caliber() >= 2.0F ? 3 : 1);
         return new BurstPlan(seed, origin, power, lightPulses, merged, children);
-    }
-
-    private static boolean flags(int mask) {
-        return mask != 0;
     }
 
     /** 128 points on a horizontal disc, evenly spaced with a little radial jitter. */

@@ -7,12 +7,14 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.OverlayTexture;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Matrix4f;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 import javax.annotation.Nullable;
 
@@ -46,8 +48,6 @@ public class PyroRocketRenderer extends EntityRenderer<AbstractPyroShellEntity> 
         if (design == null) {
             return;
         }
-        Vec3 camera = this.entityRenderDispatcher.camera.getPosition();
-        Vec3 position = entity.getPosition(partialTick).subtract(camera);
         float size = 0.24F + design.caliber() * 0.10F;
         int colour = design.colorAt((entity.tickCount % 40) / 40.0F);
 
@@ -57,11 +57,15 @@ public class PyroRocketRenderer extends EntityRenderer<AbstractPyroShellEntity> 
         float g = Math.min(1.0F, ((colour >> 8) & 0xFF) / 255.0F * 1.15F + 0.35F);
         float b = Math.min(1.0F, (colour & 0xFF) / 255.0F * 1.15F + 0.35F);
 
+        // EntityRenderDispatcher has already translated this pose to the interpolated entity
+        // position relative to the camera. Applying entity.getPosition() here would translate the
+        // quad a second time (and would also fail for entities far from the origin).
         pose.pushPose();
-        pose.translate(position.x, position.y + 0.05, position.z);
+        pose.translate(0.0D, 0.05D, 0.0D);
         pose.mulPose(this.entityRenderDispatcher.camera.rotation());
+        PoseStack.Pose glowPose = pose.last();
         VertexConsumer glow = buffers.getBuffer(RenderType.entityTranslucentEmissive(GLOW));
-        quad(glow, pose.last().pose(), size * 1.6F, r, g, b, 0.95F);
+        quad(glow, glowPose, size * 1.6F, r, g, b, 0.95F);
         pose.popPose();
 
         Vec3 motion = entity.getDeltaMovement();
@@ -71,48 +75,58 @@ public class PyroRocketRenderer extends EntityRenderer<AbstractPyroShellEntity> 
             return;
         }
 
+        // The quad is laid out in billboard (camera) space, so project the world-space velocity
+        // into that same space before choosing the tail direction.
+        Quaternionf worldToCamera = new Quaternionf(this.entityRenderDispatcher.camera.rotation()).conjugate();
+        Vector3f cameraMotion = new Vector3f((float) motion.x, (float) motion.y, (float) motion.z)
+                .rotate(worldToCamera);
+        float projectedSpeed = (float) Math.sqrt(cameraMotion.x * cameraMotion.x
+                + cameraMotion.y * cameraMotion.y);
+        float dx = projectedSpeed > 1.0E-4F ? cameraMotion.x / projectedSpeed : 0.0F;
+        float dy = projectedSpeed > 1.0E-4F ? cameraMotion.y / projectedSpeed : 1.0F;
+        float px = -dy;
+        float py = dx;
+
         pose.pushPose();
-        pose.translate(position.x, position.y, position.z);
         pose.mulPose(this.entityRenderDispatcher.camera.rotation());
-        Matrix4f matrix = pose.last().pose();
+        PoseStack.Pose trailPose = pose.last();
         VertexConsumer trail = buffers.getBuffer(RenderType.entityTranslucentEmissive(TRAIL));
 
         float length = (float) Math.min(4.5D, 0.8D + speed * 2.2D);
         float width = size * 0.8F;
-        float nx = (float) motion.x;
-        float ny = (float) motion.y;
-        float nz = (float) motion.z;
-        float norm = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (norm > 1.0E-4F) {
-            nx /= norm;
-            ny /= norm;
-            nz /= norm;
-        }
-        // The tail is projected along the velocity vector, so it always points where the shell came
-        // from regardless of the viewing angle.
-        trail.vertex(matrix, -width, -width, 0.0F).uv(0.0F, 1.0F)
-                .color(r, g, b, 0.6F).uv2(LightTexture.FULL_BRIGHT).endVertex();
-        trail.vertex(matrix, -width, width, 0.0F).uv(0.0F, 0.0F)
-                .color(r, g, b, 0.6F).uv2(LightTexture.FULL_BRIGHT).endVertex();
-        trail.vertex(matrix, -nx * length - width, -ny * length + width, -nz * length)
-                .uv(1.0F, 0.0F).color(r, g, b, 0.0F).uv2(LightTexture.FULL_BRIGHT).endVertex();
-        trail.vertex(matrix, -nx * length - width, -ny * length - width, -nz * length)
-                .uv(1.0F, 1.0F).color(r, g, b, 0.0F).uv2(LightTexture.FULL_BRIGHT).endVertex();
+        float sideX = px * width;
+        float sideY = py * width;
+        float tailX = -dx * length;
+        float tailY = -dy * length;
+
+        vertex(trail, trailPose, -sideX, -sideY, 0.0F, 0.0F, 1.0F, r, g, b, 0.6F);
+        vertex(trail, trailPose, sideX, sideY, 0.0F, 0.0F, 0.0F, r, g, b, 0.6F);
+        vertex(trail, trailPose, tailX + sideX, tailY + sideY, 0.0F,
+                1.0F, 0.0F, r, g, b, 0.0F);
+        vertex(trail, trailPose, tailX - sideX, tailY - sideY, 0.0F,
+                1.0F, 1.0F, r, g, b, 0.0F);
         pose.popPose();
 
         super.render(entity, entityYaw, partialTick, pose, buffers, packedLight);
     }
 
-    private static void quad(VertexConsumer buffer, Matrix4f matrix, float size, float r, float g,
+    private static void quad(VertexConsumer buffer, PoseStack.Pose pose, float size, float r, float g,
                              float b, float alpha) {
-        buffer.vertex(matrix, -size, -size, 0.0F).uv(0.0F, 1.0F).color(r, g, b, alpha)
-                .uv2(LightTexture.FULL_BRIGHT).endVertex();
-        buffer.vertex(matrix, -size, size, 0.0F).uv(0.0F, 0.0F).color(r, g, b, alpha)
-                .uv2(LightTexture.FULL_BRIGHT).endVertex();
-        buffer.vertex(matrix, size, size, 0.0F).uv(1.0F, 0.0F).color(r, g, b, alpha)
-                .uv2(LightTexture.FULL_BRIGHT).endVertex();
-        buffer.vertex(matrix, size, -size, 0.0F).uv(1.0F, 1.0F).color(r, g, b, alpha)
-                .uv2(LightTexture.FULL_BRIGHT).endVertex();
+        vertex(buffer, pose, -size, -size, 0.0F, 0.0F, 1.0F, r, g, b, alpha);
+        vertex(buffer, pose, -size, size, 0.0F, 0.0F, 0.0F, r, g, b, alpha);
+        vertex(buffer, pose, size, size, 0.0F, 1.0F, 0.0F, r, g, b, alpha);
+        vertex(buffer, pose, size, -size, 0.0F, 1.0F, 1.0F, r, g, b, alpha);
+    }
+
+    private static void vertex(VertexConsumer buffer, PoseStack.Pose pose, float x, float y, float z,
+                               float u, float v, float r, float g, float b, float alpha) {
+        buffer.vertex(pose.pose(), x, y, z)
+                .color(r, g, b, alpha)
+                .uv(u, v)
+                .overlayCoords(OverlayTexture.NO_OVERLAY)
+                .uv2(LightTexture.FULL_BRIGHT)
+                .normal(pose.normal(), 0.0F, 0.0F, 1.0F)
+                .endVertex();
     }
 
     @Nullable

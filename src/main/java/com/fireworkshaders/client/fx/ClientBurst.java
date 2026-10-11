@@ -6,6 +6,7 @@ import com.fireworkshaders.client.particle.PyroParticles;
 import com.fireworkshaders.common.particle.PyroParticleOptions;
 import com.fireworkshaders.pyro.BurstPlan;
 import com.fireworkshaders.pyro.BurstPlanner;
+import com.fireworkshaders.pyro.PyroMath;
 import com.fireworkshaders.pyro.RocketDesign;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -41,6 +42,7 @@ public final class ClientBurst {
         int budget = Math.max(24, Math.round(FSConfig.COMMON.maxParticlesPerBurst.get() * budgetScale));
         BurstPlan plan = BurstPlanner.plan(design, origin, seed, facing, budget);
 
+        int spectrumIndex = 0;
         for (BurstPlan.Spawn spawn : plan.spawns()) {
             PyroParticleOptions.Kind kind = switch (spawn.kind()) {
                 case SPARK -> PyroParticleOptions.Kind.SPARK;
@@ -56,7 +58,7 @@ public final class ClientBurst {
             if (kind == PyroParticleOptions.Kind.SPECTRUM) {
                 // The spectrum shader (the particle's own colour ramp) needs a per-particle phase,
                 // otherwise the whole shell cycles in lockstep and reads as one flashing blob.
-                rgb = (int) (seed % 0xFFFF);
+                rgb = (int) (PyroMath.derive(seed, 100_000 + spectrumIndex++) & 0xFFFFL);
             }
             level.addParticle(new PyroParticleOptions(kind, rgb, spawn.exposure(), spawn.scale(),
                             spawn.life(), spawn.flags()),

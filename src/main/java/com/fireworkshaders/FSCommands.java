@@ -35,6 +35,7 @@ public final class FSCommands {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("fireworkshaders")
                 .then(Commands.literal("test")
+                        .requires(source -> source.hasPermission(2))
                         .then(Commands.argument("preset", StringArgumentType.word())
                                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
                                         ShellPresets.all().stream().map(ShellPresets.Preset::id), builder))

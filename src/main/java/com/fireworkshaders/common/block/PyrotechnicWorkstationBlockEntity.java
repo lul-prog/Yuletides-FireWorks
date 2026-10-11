@@ -24,10 +24,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
- * The workstation's brain: eight inventory slots, the design under construction, and nine memory
+ * The workstation's brain: nine inventory slots, the design under construction, and nine memory
  * slots for designs the player wants to keep.
  *
  * <p>The ingredient model is deliberately physical rather than recipe-shaped: you put real chemicals
@@ -41,14 +43,15 @@ public class PyrotechnicWorkstationBlockEntity extends net.minecraft.world.level
 
     // Slot layout — the GUI is laid out around these constants, so they are the source of truth.
     public static final int SLOT_REAGENT_START = 0;
-    public static final int REAGENT_SLOTS = 4;
-    public static final int SLOT_PROPELLANT_START = 4;
+    public static final int REAGENT_SLOTS = 5;
+    public static final int SLOT_PROPELLANT_START = 5;
     public static final int PROPELLANT_SLOTS = 2;
-    public static final int SLOT_PAPER = 6;
-    public static final int SLOT_OUTPUT = 7;
-    public static final int SIZE = 8;
+    public static final int SLOT_PAPER = 7;
+    public static final int SLOT_OUTPUT = 8;
+    public static final int SIZE = 9;
 
     public static final int SAVED_SLOTS = 9;
+    private static final int INVENTORY_VERSION = 2;
 
     private final NonNullList<ItemStack> items = NonNullList.withSize(SIZE, ItemStack.EMPTY);
     private final RocketDesign[] saved = new RocketDesign[SAVED_SLOTS];
@@ -142,21 +145,35 @@ public class PyrotechnicWorkstationBlockEntity extends net.minecraft.world.level
      */
     public List<Component> missingIngredients() {
         List<Component> missing = new ArrayList<>();
+        Map<Item, Integer> reagentNeeds = new LinkedHashMap<>();
+        Map<Item, Component> reagentLabels = new LinkedHashMap<>();
+        int colourNeeded = Math.max(1, Math.round(2.0F * this.design.caliber()));
         for (Chemical chemical : this.design.palette()) {
             Item item = com.fireworkshaders.pyro.FireworkShadersId.itemFor(chemical);
-            int needed = Math.max(1, Math.round(2.0F * this.design.caliber()));
-            int have = count(item, SLOT_REAGENT_START, SLOT_REAGENT_START + REAGENT_SLOTS);
-            if (have < needed) {
+            if (item == null) {
                 missing.add(Component.translatable("gui." + FireworkShaders.MOD_ID + ".missing_count",
-                        needed - have, chemical.nameComponent()));
+                        colourNeeded, chemical.nameComponent()));
+                continue;
             }
+            reagentNeeds.merge(item, colourNeeded, Integer::sum);
+            reagentLabels.putIfAbsent(item, chemical.nameComponent());
         }
         int binderNeeded = 1 + this.design.modules().size() / 3;
-        int binderHave = count(com.fireworkshaders.pyro.FireworkShadersId.itemFor(Chemical.DEXTRIN),
-                SLOT_REAGENT_START, SLOT_REAGENT_START + REAGENT_SLOTS);
-        if (binderHave < binderNeeded) {
+        Item binder = com.fireworkshaders.pyro.FireworkShadersId.itemFor(Chemical.DEXTRIN);
+        if (binder == null) {
             missing.add(Component.translatable("gui." + FireworkShaders.MOD_ID + ".missing_count",
-                    binderNeeded - binderHave, Chemical.DEXTRIN.nameComponent()));
+                    binderNeeded, Chemical.DEXTRIN.nameComponent()));
+        } else {
+            reagentNeeds.merge(binder, binderNeeded, Integer::sum);
+            reagentLabels.putIfAbsent(binder, Chemical.DEXTRIN.nameComponent());
+        }
+        for (Map.Entry<Item, Integer> requirement : reagentNeeds.entrySet()) {
+            int have = count(requirement.getKey(), SLOT_REAGENT_START,
+                    SLOT_REAGENT_START + REAGENT_SLOTS);
+            if (have < requirement.getValue()) {
+                missing.add(Component.translatable("gui." + FireworkShaders.MOD_ID + ".missing_count",
+                        requirement.getValue() - have, reagentLabels.get(requirement.getKey())));
+            }
         }
         int grainsNeeded = this.design.grainCost() / 2 + 1;
         int grainsHave = count(Items.GUNPOWDER, SLOT_PROPELLANT_START,
@@ -291,7 +308,10 @@ public class PyrotechnicWorkstationBlockEntity extends net.minecraft.world.level
 
     @Override
     public void clearContent() {
-        this.items.clear();
+        for (int i = 0; i < this.items.size(); i++) {
+            this.items.set(i, ItemStack.EMPTY);
+        }
+        setChanged();
     }
 
     // ------------------------------------------------------------------ menu
@@ -312,7 +332,21 @@ public class PyrotechnicWorkstationBlockEntity extends net.minecraft.world.level
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
-        ContainerHelper.loadAllItems(tag, this.items);
+        if (tag.getInt("InventoryVersion") < INVENTORY_VERSION) {
+            // Version 1 had four reagent slots, so the propellant, paper and output slots all move
+            // one place to let four palette colours and the binder coexist.
+            NonNullList<ItemStack> legacy = NonNullList.withSize(8, ItemStack.EMPTY);
+            ContainerHelper.loadAllItems(tag, legacy);
+            for (int i = 0; i < 4; i++) {
+                this.items.set(i, legacy.get(i));
+            }
+            this.items.set(SLOT_PROPELLANT_START, legacy.get(4));
+            this.items.set(SLOT_PROPELLANT_START + 1, legacy.get(5));
+            this.items.set(SLOT_PAPER, legacy.get(6));
+            this.items.set(SLOT_OUTPUT, legacy.get(7));
+        } else {
+            ContainerHelper.loadAllItems(tag, this.items);
+        }
         if (tag.contains("Design")) {
             this.design = RocketDesign.fromTag(tag.getCompound("Design"));
         }
@@ -329,6 +363,7 @@ public class PyrotechnicWorkstationBlockEntity extends net.minecraft.world.level
     @Override
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
+        tag.putInt("InventoryVersion", INVENTORY_VERSION);
         ContainerHelper.saveAllItems(tag, this.items);
         tag.put("Design", this.design.toTag());
         CompoundTag memory = new CompoundTag();
