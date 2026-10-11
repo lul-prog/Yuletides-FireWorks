@@ -70,7 +70,7 @@ public final class BurstExecution {
 
         if (FSConfig.COMMON.serverPlaysSound.get()) {
             level.playSound(null, pos.x, pos.y, pos.z,
-                    design.power() > 1.6F ? SoundEvents.FIREWORK_LARGE_BLAST : SoundEvents.FIREWORK_BLAST,
+                    design.power() > 1.6F ? SoundEvents.FIREWORK_ROCKET_LARGE_BLAST : SoundEvents.FIREWORK_ROCKET_BLAST,
                     SoundSource.WEATHER, 8.0F, 0.85F + level.random.nextFloat() * 0.2F);
         }
     }

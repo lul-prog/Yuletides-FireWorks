@@ -75,9 +75,8 @@ public final class FSCommands {
             preset = ShellPresets.byIndex(0);
         }
         ShellPresets.Preset resolved = preset;
-        if (!(ctx.getSource().getLevel() instanceof ServerLevel level)) {
-            return 0;
-        }
+        // 1.20.1: getLevel() already returns ServerLevel, no instanceof check needed.
+        ServerLevel level = ctx.getSource().getLevel();
         Vec3 origin = ctx.getSource().getPosition().add(0.0, height, 0.0);
         ServerPlayer player = ctx.getSource().getPlayer();
         PyroRocketEntity.launch(level, origin, resolved.design(),
