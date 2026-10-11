@@ -16,7 +16,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import javax.annotation.Nullable;
 
 /**
- * The workstation's container: eight machine slots plus the player's inventory.
+ * The workstation's container: nine machine slots plus the player's inventory.
  *
  * <p>Design edits are <em>not</em> container operations, and they deliberately do not go through
  * the slot system: the design is not an item, it is a document being edited, and it is kept

@@ -151,19 +151,19 @@ public class RemoteIgniterItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
-        if (!level.isClientSide) {
-            if (player.isShiftKeyDown()) {
+        if (player.isShiftKeyDown()) {
+            if (!level.isClientSide) {
                 Mode next = cycleMode(stack);
                 player.displayClientMessage(Component.translatable(msgKey("mode"),
                         Component.translatable("mode." + FireworkShaders.MOD_ID
                                 + "." + next.name().toLowerCase(Locale.ROOT))).withStyle(ChatFormatting.AQUA),
                         true);
-            } else {
-                // The server resolves the action from its own copy of the stack: the client only
-                // ever says "run the current mode".
-                FSNetwork.sendToServer(new C2SIgniterActionPacket(
-                        actionFor(mode(stack)), hand.ordinal()));
             }
+        } else if (level.isClientSide) {
+            // Custom actions must be sent by the client. Sending this from the server-side item
+            // callback attempts to enqueue a client-to-server packet from the wrong direction.
+            FSNetwork.sendToServer(new C2SIgniterActionPacket(
+                    actionFor(mode(stack)), hand.ordinal()));
         }
         player.swing(hand, true);
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());

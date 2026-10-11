@@ -38,6 +38,10 @@ public final class WorkstationEditor {
 
     @Nullable
     private static PyrotechnicWorkstationBlockEntity workstation(ServerPlayer player, BlockPos pos) {
+        if (!(player.containerMenu instanceof PyrotechnicWorkstationMenu menu)
+                || !menu.getPos().equals(pos)) {
+            return null;
+        }
         if (!player.level().hasChunkAt(pos)) {
             return null;
         }

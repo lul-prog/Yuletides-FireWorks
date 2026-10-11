@@ -55,7 +55,7 @@ public final class RocketDesign {
 
     private RocketDesign(List<Chemical> palette, ShellShape shape, EnumSet<EffectModule> modules,
                          float caliber, int fuse, String name, @Nullable RocketDesign payload) {
-        this.palette = Collections.unmodifiableList(palette);
+        this.palette = Collections.unmodifiableList(new ArrayList<>(palette));
         this.shape = shape;
         this.modules = modules.clone();
         this.caliber = caliber;
@@ -196,10 +196,17 @@ public final class RocketDesign {
         }
 
         public RocketDesign build() {
-            float cal = PyroMath.clamp(this.caliber, MIN_CALIBER, MAX_CALIBER);
+            float cal = Float.isFinite(this.caliber)
+                    ? PyroMath.clamp(this.caliber, MIN_CALIBER, MAX_CALIBER) : MIN_CALIBER;
             int fuseTicks = this.fuse > 0 ? PyroMath.clampInt(this.fuse, 8, 260) : defaultFuse(cal);
+            RocketDesign child = this.payload;
+            if (child != null && child.payload != null) {
+                // Enforce the documented one-level payload limit for designs built through APIs as
+                // well as designs loaded from item NBT.
+                child = child.toBuilder().payload(null).build();
+            }
             return new RocketDesign(this.palette, this.shape, this.modules, cal, fuseTicks, this.name,
-                    this.payload);
+                    child);
         }
     }
 
@@ -535,6 +542,10 @@ public final class RocketDesign {
     }
 
     public static RocketDesign fromTag(CompoundTag tag) {
+        return fromTag(tag, 0);
+    }
+
+    private static RocketDesign fromTag(CompoundTag tag, int depth) {
         Builder b = new Builder();
         if (tag.contains("palette")) {
             int[] colours = tag.getIntArray("palette");
@@ -549,12 +560,10 @@ public final class RocketDesign {
         b.fuse(tag.contains("fuse") ? tag.getInt("fuse") : -1);
         b.modules(EffectModule.fromMask(tag.getInt("modules")));
         b.name(tag.getString("name"));
-        if (tag.contains("payload")) {
-            RocketDesign child = fromTag(tag.getCompound("payload"));
-            if (child.payload == null) {
-                // Depth guard: never allow a design tree deeper than one break.
-                b.payload(child);
-            }
+        if (depth < MAX_PAYLOAD_DEPTH && tag.contains("payload")) {
+            // Stop descending before reading a third design. Checking the decoded child afterwards
+            // is too late to protect against maliciously deep NBT.
+            b.payload(fromTag(tag.getCompound("payload"), depth + 1));
         }
         return b.build();
     }

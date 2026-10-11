@@ -177,6 +177,8 @@ public final class PyroParticleOptions implements ParticleOptions {
         String token = reader.readUnquotedString();
         if (token.startsWith("#")) {
             token = token.substring(1);
+        } else if (token.startsWith("0x") || token.startsWith("0X")) {
+            token = token.substring(2);
         }
         try {
             return (int) Long.parseLong(token, 16) & 0xFFFFFF;
