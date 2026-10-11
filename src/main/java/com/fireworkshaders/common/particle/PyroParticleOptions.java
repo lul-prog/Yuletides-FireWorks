@@ -181,8 +181,8 @@ public final class PyroParticleOptions implements ParticleOptions {
         try {
             return (int) Long.parseLong(token, 16) & 0xFFFFFF;
         } catch (NumberFormatException e) {
-            throw CommandSyntaxException.BUILT_IN_EXCEPTIONS.integerInvalidHexNumber()
-                    .createWithContext(reader);
+            throw CommandSyntaxException.BUILT_IN_EXCEPTIONS.readerInvalidInt()
+                    .createWithContext(reader, token);
         }
     }
 }

@@ -196,7 +196,7 @@ public final class RocketDesign {
         }
 
         public RocketDesign build() {
-            float cal = PyroMath.clamp(this.caliber, MIN_CALIBER, MAX_CALIBER);
+            float cal = (float) PyroMath.clamp(this.caliber, MIN_CALIBER, MAX_CALIBER);
             int fuseTicks = this.fuse > 0 ? PyroMath.clampInt(this.fuse, 8, 260) : defaultFuse(cal);
             return new RocketDesign(this.palette, this.shape, this.modules, cal, fuseTicks, this.name,
                     this.payload);
