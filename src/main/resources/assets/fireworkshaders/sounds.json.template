@@ -1,0 +1,53 @@
+{
+  "__comment": [
+    "THIS FILE IS A TEMPLATE. Rename it to sounds.json to enable the mod's own recordings.",
+    "",
+    "Yuletide Fireworks ships without .ogg assets on purpose: a convincing firework recording is a",
+    "licence and a microphone, not a line of code. The mod is fully playable without this file - the",
+    "audio mixer layers vanilla's blast events with distance, air absorption and echo modelling,",
+    "which is where most of the perceived quality comes from anyway.",
+    "",
+    "To use your own audio:",
+    "  1. drop the files into  src/main/resources/assets/fireworkshaders/sounds/fireworks/",
+    "     (or into a resource pack at the same path),",
+    "  2. rename this file to sounds.json in that same assets/fireworkshaders/ folder,",
+    "  3. keep 44.1 kHz mono or stereo - the mixer only changes volume, pitch and timing, it does",
+    "     not remix, so a mono recording places better in the stereo field.",
+    "",
+    "Mixer contract, so recordings can be authored against it:",
+    "  * boom / boom_far are played at the break, boom_far only for breaks further than 40 blocks,",
+    "  * echo is replayed 2-4 times with rising spacing and falling pitch, once per echoCount,",
+    "  * crackle is pitched up to 1.6x and volume-scaled per shell, on top of the crackle pops,",
+    "  * whistle is a loop-like short sample retriggered during the ascent (pitch rises with height),",
+    "  * shriek is used only by the Sonic Boom's SHRIEK lift module,",
+    "  * launch is played at lift-off, at the pad, at a distance-attenuated volume."
+  ],
+  "fireworks.boom": {
+    "subtitle": "subtitles.fireworkshaders.boom",
+    "sounds": [{"name": "fireworks/boom", "stream": false}]
+  },
+  "fireworks.boom_far": {
+    "subtitle": "subtitles.fireworkshaders.boom",
+    "sounds": [{"name": "fireworks/boom_far", "stream": false}]
+  },
+  "fireworks.echo": {
+    "subtitle": "subtitles.fireworkshaders.boom",
+    "sounds": [{"name": "fireworks/echo", "stream": false}]
+  },
+  "fireworks.crackle": {
+    "subtitle": "subtitles.fireworkshaders.crackle",
+    "sounds": [{"name": "fireworks/crackle", "stream": false}]
+  },
+  "fireworks.whistle": {
+    "subtitle": "subtitles.fireworkshaders.crackle",
+    "sounds": [{"name": "fireworks/whistle", "stream": false}]
+  },
+  "fireworks.shriek": {
+    "subtitle": "subtitles.fireworkshaders.crackle",
+    "sounds": [{"name": "fireworks/shriek", "stream": false}]
+  },
+  "fireworks.launch": {
+    "subtitle": "subtitles.fireworkshaders.crackle",
+    "sounds": [{"name": "fireworks/launch", "stream": false}]
+  }
+}

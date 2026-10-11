@@ -1,0 +1,44 @@
+{
+  "variants": {
+    "facing=north,lit=false": {
+      "model": "fireworkshaders:block/pyrotechnic_workstation",
+      "y": 0,
+      "uvlock": true
+    },
+    "facing=north,lit=true": {
+      "model": "fireworkshaders:block/pyrotechnic_workstation_lit",
+      "y": 0,
+      "uvlock": true
+    },
+    "facing=east,lit=false": {
+      "model": "fireworkshaders:block/pyrotechnic_workstation",
+      "y": 90,
+      "uvlock": true
+    },
+    "facing=east,lit=true": {
+      "model": "fireworkshaders:block/pyrotechnic_workstation_lit",
+      "y": 90,
+      "uvlock": true
+    },
+    "facing=south,lit=false": {
+      "model": "fireworkshaders:block/pyrotechnic_workstation",
+      "y": 180,
+      "uvlock": true
+    },
+    "facing=south,lit=true": {
+      "model": "fireworkshaders:block/pyrotechnic_workstation_lit",
+      "y": 180,
+      "uvlock": true
+    },
+    "facing=west,lit=false": {
+      "model": "fireworkshaders:block/pyrotechnic_workstation",
+      "y": 270,
+      "uvlock": true
+    },
+    "facing=west,lit=true": {
+      "model": "fireworkshaders:block/pyrotechnic_workstation_lit",
+      "y": 270,
+      "uvlock": true
+    }
+  }
+}
