@@ -60,6 +60,36 @@ def fetch(fqn):
     return text
 
 
+def fetch_nested(simple):
+    """Nested types have no file of their own in the decompiled tree; find the declaration inside
+    any class already downloaded and return just that block."""
+    import glob
+    pattern = re.compile(r"\b(?:interface|class|enum|record)\s+" + re.escape(simple) + r"\b")
+    for path in glob.glob(os.path.join(CACHE, "*.java")):
+        try:
+            text = open(path, encoding="utf-8").read()
+        except OSError:
+            continue
+        m = pattern.search(text)
+        if not m:
+            continue
+        brace = text.find("{", m.end())
+        if brace < 0:
+            continue
+        depth = 0
+        i = brace
+        while i < len(text):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    break
+            i += 1
+        return text[m.start():i + 1]
+    return None
+
+
 MEMBER_RE = re.compile(r"\b([A-Z][A-Za-z0-9_]*)\s*\.\s*([a-z_][A-Za-z0-9_]*)\b")
 
 

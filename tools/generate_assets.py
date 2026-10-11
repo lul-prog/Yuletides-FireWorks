@@ -201,15 +201,36 @@ def slot_recess(draw, x, y, tint=(24, 27, 34)):
     draw.line([x - 1, y + 16, x + 16, y + 16], fill=(60, 66, 80, 255))
 
 
+def bevel(draw, box, light=(120, 128, 146), dark=(20, 22, 28)):
+    """The two-pixel inner bevel that makes a flat rectangle read as a raised metal panel."""
+    x0, y0, x1, y1 = box
+    draw.line([x0, y0, x1 - 1, y0], fill=light + (255,))
+    draw.line([x0, y0, x0, y1 - 1], fill=light + (255,))
+    draw.line([x0, y1, x1, y1], fill=dark + (255,))
+    draw.line([x1, y0, x1, y1], fill=dark + (255,))
+    draw.line([x0 + 1, y0 + 1, x1 - 2, y0 + 1], fill=(light[0] // 2, light[1] // 2, light[2] // 2, 255))
+    draw.line([x0 + 1, y0 + 1, x0 + 1, y1 - 2], fill=(light[0] // 2, light[1] // 2, light[2] // 2, 255))
+
+
+def rivet(draw, x, y, shade=(150, 158, 176)):
+    draw.point((x, y), fill=shade + (255,))
+    draw.point((x + 1, y), fill=(70, 74, 86, 255))
+    draw.point((x, y + 1), fill=(70, 74, 86, 255))
+
+
 def generate_gui():
     out = ensure(ASSETS, "textures", "gui")
 
     # ---- workstation: 340x236, matching PyrotechnicWorkstationMenu -------------------------
     img = panel_texture((340, 236), (44, 48, 58), (96, 104, 124), seed=11)
     draw = ImageDraw.Draw(img)
-    draw.rectangle([1, 1, 176, 234], fill=(38, 42, 51, 255))
-    draw.rectangle([177, 1, 338, 234], fill=(33, 36, 45, 255))
-    draw.rectangle([177, 1, 177, 234], fill=(70, 76, 92, 255))
+    # machine half
+    draw.rectangle([2, 2, 176, 233], fill=(38, 42, 51, 255))
+    bevel(draw, (2, 2, 176, 233))
+    # controls half, recessed
+    draw.rectangle([178, 2, 337, 233], fill=(33, 36, 45, 255))
+    draw.rectangle([178, 2, 337, 233], outline=(70, 76, 92, 255))
+    draw.line([178, 14, 337, 14], fill=(70, 76, 92, 255))
 
     # machine slots (mirrors the menu constants)
     for i in range(4):
@@ -218,30 +239,62 @@ def generate_gui():
         slot_recess(draw, 60, 26 + i * 22)
     slot_recess(draw, 60, 92)
     slot_recess(draw, 120, 59, tint=(20, 22, 28))
-    # the press arrow
+
+    # the press arrow, with a pressure gauge next to it
     draw.polygon([(84, 58), (106, 67), (84, 76)], fill=(196, 132, 48, 255))
     draw.rectangle([78, 64, 84, 70], fill=(196, 132, 48, 255))
-    # module board grid hint
+    draw.polygon([(86, 60), (104, 67), (86, 74)], fill=(224, 164, 74, 255))
+    draw.ellipse([44, 58, 62, 76], fill=(26, 29, 36, 255), outline=(120, 128, 146, 255))
+    draw.line([53, 67, 58, 62], fill=(214, 90, 70, 255))
+    draw.point((53, 67), fill=(220, 226, 240, 255))
+
+    # label rails on the reagent column
+    for i in range(4):
+        draw.line([46, 32 + i * 22, 74, 32 + i * 22], fill=(58, 62, 74, 255))
+
+    # hazard stripe across the bottom of the machine half
+    for x in range(4, 174, 8):
+        draw.polygon([(x, 226), (x + 4, 226), (x + 8, 217), (x + 4, 217)],
+                     fill=(196, 152, 44, 255))
+
+    # module board: 7 rows of bracket pairs, with a column divider
     for row in range(7):
-        draw.line([178, 26 + row * 16, 250, 26 + row * 16], fill=(48, 52, 63, 255))
+        y = 26 + row * 16
+        draw.line([186, y, 250, y], fill=(48, 52, 63, 255))
+        draw.line([250, y, 250, y + 12], fill=(48, 52, 63, 255))
     # preview frame
-    draw.rectangle([251, 17, 332, 98], fill=(16, 18, 24, 255))
-    draw.rectangle([251, 17, 332, 98], outline=(88, 96, 116, 255))
-    # labels
+    draw.rectangle([251, 16, 332, 97], fill=(16, 18, 24, 255))
+    draw.rectangle([251, 16, 332, 97], outline=(88, 96, 116, 255))
+    for corner in ((251, 16), (330, 16), (251, 95), (330, 95)):
+        rivet(draw, corner[0], corner[1])
+    # ruler marks down the control column
+    for y in range(104, 232, 8):
+        draw.line([178, y, 181, y], fill=(88, 96, 116, 255))
     for y in (92, 108, 124, 140):
         draw.line([250, y, 250, y + 22], fill=(70, 76, 92, 255))
+    for corner in ((6, 6), (170, 6), (6, 228), (170, 228)):
+        rivet(draw, corner[0], corner[1])
     save(img, out, "pyrotechnic_workstation.png")
 
     # ---- launch pad: 256x220, matching LaunchPadMenu ---------------------------------------
     img = panel_texture((256, 220), (44, 48, 58), (96, 104, 124), seed=13)
     draw = ImageDraw.Draw(img)
-    draw.rectangle([1, 1, 174, 218], fill=(38, 42, 51, 255))
-    draw.rectangle([175, 1, 254, 218], fill=(33, 36, 45, 255))
+    draw.rectangle([2, 2, 174, 217], fill=(38, 42, 51, 255))
+    bevel(draw, (2, 2, 174, 217))
+    draw.rectangle([176, 2, 253, 217], fill=(33, 36, 45, 255))
+    draw.rectangle([176, 2, 253, 217], outline=(70, 76, 92, 255))
     for row in range(3):
         for col in range(3):
             slot_recess(draw, 26 + col * 18, 22 + row * 18)
+    # launch rail: a fan of guide lines from the tube grid up to the sky
     draw.rectangle([79, 20, 172, 152], fill=(26, 29, 36, 255))
     draw.rectangle([79, 20, 172, 152], outline=(70, 76, 92, 255))
+    for i in range(5):
+        x = 92 + i * 16
+        draw.line([x, 148, x + 8, 32], fill=(44, 48, 58, 255))
+    draw.polygon([(120, 132), (132, 132), (126, 118)], fill=(196, 132, 48, 255))
+    for corner in ((6, 6), (168, 6), (6, 212), (168, 212)):
+        rivet(draw, corner[0], corner[1])
     save(img, out, "launch_pad.png")
     return {}
 

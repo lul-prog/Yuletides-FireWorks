@@ -13,10 +13,20 @@ import sys
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from check_vanilla import fetch, BY_SIMPLE, FORGE_BY_SIMPLE  # noqa: E402
+from check_vanilla import fetch, fetch_nested, BY_SIMPLE, FORGE_BY_SIMPLE  # noqa: E402,F401
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "src", "main", "java")
+
+# Nested types (ParticleOptions.Deserializer, ParticleEngine.SpriteParticleRegistration, ...) are
+# referenced by their inner name in source but stored under their binary name in the tree, so index
+# them both ways.
+VANILLA_SIMPLE = defaultdict(list)
+FORGE_SIMPLE = defaultdict(list)
+for _table, _target in ((BY_SIMPLE, VANILLA_SIMPLE), (FORGE_BY_SIMPLE, FORGE_SIMPLE)):
+    for _fqn, _list in _table.items():
+        for _name in {_fqn.split(".")[-1], _fqn.split("$")[-1]}:
+            _target[_name].extend(_list)
 
 WITH_BODY = re.compile(
     r"(?:^|\n)\s*(?:(?:public|protected|private|static|final|abstract|synchronized|default|native)\s+)*"
@@ -141,7 +151,8 @@ def main():
             for m in re.finditer(r"(?:class|interface|enum|record)\s+\w+([^;{}]*?)\{", clean):
                 clause_parents.extend(parents_of(m.group(1)))
             # anonymous subclasses contribute their own supertype to the chain
-            for m in re.finditer(r"new\s+([A-Z][\w.]*)\s*\([^()]*\)\s*\{", clean):
+            for m in re.finditer(r"new\s+([A-Z][\w.]*)\s*(?:<[^;{}()]*>)?\s*\([^()]*\)\s*\{",
+                                 clean):
                 simple = m.group(1).split(".")[-1]
                 if simple not in clause_parents:
                     clause_parents.append(simple)
@@ -164,11 +175,17 @@ def main():
                 candidates = []
                 if simple in imports:
                     candidates.append(imports[simple])
-                candidates += BY_SIMPLE.get(simple, [])
-                candidates += FORGE_BY_SIMPLE.get(simple, [])
+                candidates += VANILLA_SIMPLE.get(simple, [])
+                candidates += FORGE_SIMPLE.get(simple, [])
                 if simple in PROJECT:
                     continue
                 got = False
+                if not candidates:
+                    nested = fetch_nested(simple)
+                    if nested is not None:
+                        known |= methods_of(nested)
+                        queue.extend(parents_of(nested))
+                        got = True
                 for cand in candidates:
                     if not (cand.startswith("net.minecraft") or cand.startswith("com.mojang")
                             or cand.startswith("net.minecraftforge")):

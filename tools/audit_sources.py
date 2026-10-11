@@ -34,7 +34,15 @@ def vanilla_member_closure(simple, depth=0):
         return set(), False
     names = set()
     ok = False
-    queue = list(VANILLA_SIMPLE.get(simple, [])) + list(FORGE_SIMPLE.get(simple, []))
+    candidates0 = list(VANILLA_SIMPLE.get(simple, [])) + list(FORGE_SIMPLE.get(simple, []))
+    if not candidates0:
+        from check_vanilla import fetch_nested
+        nested = fetch_nested(simple)
+        if nested is not None:
+            return {n for n, _c in vanilla_methods(nested)}, True
+    queue = candidates0
+    for table in (list(VANILLA_SIMPLE.items()), list(FORGE_SIMPLE.items())):
+        pass
     seen = set()
     while queue:
         cand = queue.pop(0)
@@ -459,6 +467,46 @@ def main():
             if reported:
                 continue
     print(f"  {inst_hits} unresolved instance calls")
+
+    print()
+    print("=" * 78)
+    print("CONFIG OPTION REFERENCES")
+    print("=" * 78)
+    cfg_path = os.path.join(SRC, "com", "fireworkshaders", "FSConfig.java")
+    if os.path.exists(cfg_path):
+        cfg = open(cfg_path, encoding="utf-8").read()
+        declared = {}
+        for block in ("Common", "Client"):
+            m = re.search(r"final class " + block + r"\b", cfg)
+            i = cfg.index("{", m.end())
+            depth = 0
+            j = i
+            while j < len(cfg):
+                if cfg[j] == "{":
+                    depth += 1
+                elif cfg[j] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                j += 1
+            declared[block.upper()] = set(re.findall(
+                r"public final ForgeConfigSpec\.\w+\s+(\w+)\s*;", cfg[i:j]))
+        bad = 0
+        used = set()
+        for path, code in codes.items():
+            for m in re.finditer(r"FSConfig\.(COMMON|CLIENT)\.(\w+)", code):
+                block, name = m.group(1), m.group(2)
+                used.add((block, name))
+                if name not in declared.get(block, set()):
+                    print(f"  {os.path.relpath(path, ROOT)}: FSConfig.{block}.{name} is not declared")
+                    bad += 1
+        for block, names in declared.items():
+            for name in sorted(names):
+                if (block, name) not in used:
+                    print(f"  FSConfig.{block}.{name}: declared but never read")
+        print(f"  {len(used)} option references, {bad} dangling")
+    else:
+        print("  FSConfig.java not found")
 
     print()
     print("=" * 78)
